@@ -1,0 +1,18 @@
+__pycache__/
+*.pyc
+.venv/
+venv/
+
+# 私人报表和导出结果
+1.财务报表*.xlsx
+2.资产类财务数据*.xlsx
+资产类财务数据_导出.xlsx
+*.xls
+
+# 本地穿透和浏览器运行包
+bin/cloudflared.exe
+bin/cloudflared.log
+bin/pyodide-core-027.tar.bz2
+bin/rels.json
+web/pyodide/
+web/vendor/
