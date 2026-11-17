@@ -1,29 +1,33 @@
 # -*- coding: utf-8 -*-
-"""Streamlit 云端入口。计算在 Streamlit 云上完成，不经过现有服务器。"""
+"""Streamlit 云端入口。页面沿用原来的整理界面，计算在 Streamlit 上完成。"""
 from __future__ import annotations
 
+import base64
 import io
 import tempfile
 import zipfile
 from pathlib import Path
 
 import streamlit as st
+import streamlit.components.v1 as components
 
-from generate_financial_export import UNIT_NAME, Exporter
+from generate_financial_export import Exporter
 
 ROOT = Path(__file__).resolve().parent
 DEFAULT_TEMPLATE = ROOT / "web" / "template.xlsx"
 SOURCE_SUFFIXES = {".xls", ".xlsx", ".et"}
 MAX_BYTES = 25 * 1024 * 1024
 UNZIP_LIMIT = 80 * 1024 * 1024
+_ui = components.declare_component("fin_ui", path=str(ROOT / "web" / "component"))
 
 st.set_page_config(page_title="财务报表整理", page_icon="📊", layout="centered")
 st.markdown(
     """
 <style>
-.block-container { padding-top: 1.2rem; max-width: 42rem; }
-div.stButton > button { width: 100%; height: 3rem; }
-div.stDownloadButton > button { width: 100%; height: 3rem; }
+#MainMenu, footer, header, [data-testid="stHeader"], [data-testid="stToolbar"] { visibility: hidden; height: 0; }
+.block-container { padding: 0; max-width: 100%; }
+.stApp { background: #f4f0e8; }
+iframe { border: 0; }
 </style>
 """,
     unsafe_allow_html=True,
@@ -32,6 +36,10 @@ div.stDownloadButton > button { width: 100%; height: 3rem; }
 
 def _suffix(name: str) -> str:
     return Path(name or "").suffix.lower()
+
+
+def _decode(text: str) -> bytes:
+    return base64.b64decode(text or "")
 
 
 def _xlsx_explodes(data: bytes) -> bool:
@@ -85,64 +93,48 @@ def _convert(source_name: str, source_bytes: bytes, template_bytes: bytes | None
     return payload, logs
 
 
-st.title("财务报表整理")
-st.caption("上传系统导入版三表，生成资产、损益、现金流和指标简表。金额会换算，比率和百分比保持原口径。")
+def _fail(request_id: str, detail: str) -> dict:
+    return {"id": request_id, "ok": False, "detail": detail}
 
-source = st.file_uploader("财务报表", type=["xls", "xlsx", "et"])
-unit_label = st.radio("输出单位", ["亿元", "万元"], horizontal=True)
-unit = "yi" if unit_label == "亿元" else "wan"
-periods = st.number_input("取最近几期", min_value=1, max_value=20, value=4, step=1)
-template = st.file_uploader("自定义模板（可选，仅 xlsx）", type=["xlsx"])
 
-if st.button("生成并下载", type="primary"):
-    if source is None:
-        st.error("请先选择财务报表。")
-    elif not DEFAULT_TEMPLATE.exists() and template is None:
-        st.error("服务器上缺少默认导出模板。")
-    else:
-        source_bytes = source.getvalue()
-        problem = _check_source(source.name, source_bytes)
-        template_bytes = None
-        if problem is None and template is not None:
-            template_bytes = template.getvalue()
-            if not template_bytes.startswith(b"PK"):
-                problem = "自定义模板不是 xlsx 格式。"
-            elif _xlsx_explodes(template_bytes):
-                problem = "自定义模板解压后过大。"
-        if problem:
-            st.error(problem)
-        else:
-            try:
-                with st.spinner("正在整理，请稍等…"):
-                    payload, logs = _convert(source.name, source_bytes, template_bytes, unit, int(periods))
-                st.session_state["payload"] = payload
-                st.session_state["logs"] = logs
-            except ValueError as exc:
-                st.error(str(exc))
-            except Exception:
-                st.error("整理失败，请确认上传的是系统导出的财务报表。")
-
-logs = st.session_state.get("logs") or []
-if logs:
-    warned = any(line.startswith("【") for line in logs)
-    if warned:
-        st.warning("已生成，请看提示")
-    else:
-        st.success("已生成")
-    for line in logs:
-        if line.startswith("【勾稽告警】") or line.startswith("【严重告警】"):
-            st.warning(line)
-        elif line.startswith("【未映射科目】") or line.startswith("【未识别模板行】"):
-            st.error(line)
-        else:
-            st.caption(line)
-
-payload = st.session_state.get("payload")
-if payload:
-    st.download_button(
-        f"下载导出文件（{UNIT_NAME[unit]}）",
-        data=payload,
-        file_name="资产类财务数据_导出.xlsx",
-        mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-        type="primary",
-    )
+event = _ui(result=st.session_state.get("reply"), default=None, key="fin_ui")
+if isinstance(event, dict) and event.get("kind") == "convert":
+    request_id = str(event.get("id") or "")
+    if request_id and request_id != st.session_state.get("done_id"):
+        st.session_state["done_id"] = request_id
+        try:
+            source_bytes = _decode(str(event.get("source_b64") or ""))
+            problem = _check_source(str(event.get("source_name") or ""), source_bytes)
+            template_bytes = None
+            if problem is None and event.get("template_b64"):
+                template_bytes = _decode(str(event.get("template_b64")))
+                if _suffix(str(event.get("template_name") or "")) != ".xlsx" or not template_bytes.startswith(b"PK"):
+                    problem = "自定义模板不是 xlsx 格式。"
+                elif _xlsx_explodes(template_bytes):
+                    problem = "自定义模板解压后过大。"
+            if problem is None and not DEFAULT_TEMPLATE.exists() and template_bytes is None:
+                problem = "缺少默认导出模板。"
+            periods = int(event.get("periods") or 4)
+            unit = str(event.get("unit") or "yi")
+            if problem:
+                st.session_state["reply"] = _fail(request_id, problem)
+            else:
+                payload, logs = _convert(
+                    str(event.get("source_name") or "source.xlsx"),
+                    source_bytes,
+                    template_bytes,
+                    unit,
+                    periods,
+                )
+                st.session_state["reply"] = {
+                    "id": request_id,
+                    "ok": True,
+                    "filename": "资产类财务数据_导出.xlsx",
+                    "logs": logs,
+                    "content_base64": base64.b64encode(payload).decode("ascii"),
+                }
+        except ValueError as exc:
+            st.session_state["reply"] = _fail(request_id, str(exc))
+        except Exception:
+            st.session_state["reply"] = _fail(request_id, "整理失败，请确认上传的是系统导出的财务报表。")
+        st.rerun()

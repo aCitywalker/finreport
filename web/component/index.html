@@ -1,0 +1,339 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>财务报表整理</title>
+  <style>
+    :root {
+      --ink: #1c2824;
+      --muted: #6a756f;
+      --line: #e4ddd2;
+      --paper: #f4f0e8;
+      --card: #fffcf8;
+      --green: #0f6b52;
+      --green-deep: #0a4c3a;
+      --warn: #8a4b12;
+      --bad: #8d2d2d;
+      --ok: #0f6b52;
+    }
+    * { box-sizing: border-box; }
+    html, body { margin: 0; padding: 0; }
+    body {
+      color: var(--ink);
+      background:
+        radial-gradient(720px 320px at 50% -80px, rgba(15, 107, 82, 0.14), transparent 70%),
+        var(--paper);
+      font-family: "Microsoft YaHei UI", "PingFang SC", "Noto Sans SC", sans-serif;
+    }
+    .page {
+      width: min(760px, calc(100% - 32px));
+      margin: 0 auto;
+      padding: 48px 0 40px;
+    }
+    header { display: flex; gap: 16px; align-items: center; margin-bottom: 22px; }
+    .mark {
+      width: 46px; height: 46px; border-radius: 14px; flex: none;
+      background: linear-gradient(155deg, #1a8f6e 0%, var(--green-deep) 100%);
+      box-shadow: 0 10px 24px rgba(10, 76, 58, 0.22);
+      position: relative;
+    }
+    .mark:before, .mark:after {
+      content: ""; position: absolute; left: 12px; right: 12px; height: 2px;
+      background: rgba(255,255,255,.9); border-radius: 2px;
+    }
+    .mark:before { top: 16px; }
+    .mark:after { top: 24px; width: 14px; }
+    h1 { margin: 0; font-size: 28px; letter-spacing: 0.06em; font-weight: 700; }
+    .sub { margin: 6px 0 0; color: var(--muted); font-size: 14px; }
+    .panel {
+      background: var(--card);
+      border: 1px solid rgba(228, 221, 210, 0.95);
+      border-radius: 28px;
+      box-shadow: 0 24px 60px rgba(48, 39, 24, 0.08);
+      padding: 28px;
+    }
+    .drop {
+      border: 1.5px dashed #d3c8b6;
+      background:
+        linear-gradient(180deg, rgba(15, 107, 82, 0.04), transparent 42%),
+        #fbf8f3;
+      border-radius: 22px;
+      min-height: 196px;
+      display: flex; flex-direction: column; align-items: center; justify-content: center;
+      text-align: center; padding: 28px 20px; cursor: pointer;
+    }
+    .drop:hover, .drop.over { border-color: var(--green); background: #f4faf7; }
+    .glyph {
+      width: 48px; height: 48px; border-radius: 16px; margin-bottom: 12px;
+      background: white; color: var(--green-deep);
+      display: grid; place-items: center;
+      box-shadow: 0 8px 18px rgba(15, 107, 82, 0.08);
+    }
+    .glyph svg { width: 22px; height: 22px; }
+    .drop strong { font-size: 18px; letter-spacing: 0.04em; }
+    .drop p { margin: 8px 0 0; color: var(--muted); font-size: 13px; }
+    .file-pill {
+      margin-top: 14px; display: none; align-items: center;
+      background: #e8f4ee; color: var(--green-deep);
+      border-radius: 999px; padding: 6px 14px; font-size: 13px;
+    }
+    .file-pill.show { display: inline-flex; }
+    input[type="file"] { display: none; }
+    .grid { display: grid; grid-template-columns: 1fr 180px; gap: 16px; margin-top: 22px; }
+    label.field { display: flex; flex-direction: column; gap: 8px; font-size: 13px; color: var(--muted); }
+    .choice { display: flex; background: #f3efe7; border-radius: 14px; padding: 4px; gap: 4px; }
+    .choice button {
+      flex: 1; border: 0; background: transparent; border-radius: 11px;
+      padding: 11px 8px; font: inherit; color: var(--ink); cursor: pointer;
+    }
+    .choice button.active {
+      background: white; color: var(--green-deep); font-weight: 700;
+      box-shadow: 0 2px 8px rgba(48, 39, 24, 0.06);
+    }
+    input[type="number"] {
+      border: 1px solid var(--line); background: white; border-radius: 14px;
+      padding: 11px 14px; font: inherit; color: var(--ink); width: 100%;
+    }
+    .template-row { display: flex; align-items: center; gap: 12px; margin-top: 16px; }
+    .ghost {
+      border: 0; background: transparent; color: var(--green-deep);
+      font: inherit; font-size: 13px; cursor: pointer; padding: 0;
+    }
+    .ghost:hover { text-decoration: underline; }
+    #templateName { color: var(--muted); font-size: 13px; }
+    .actions { display: flex; align-items: center; gap: 16px; margin-top: 22px; }
+    button.primary {
+      border: 0; cursor: pointer; color: white;
+      background: linear-gradient(180deg, #149672, var(--green-deep));
+      border-radius: 16px; padding: 13px 26px; font: inherit; font-size: 15px; font-weight: 700;
+      letter-spacing: 0.04em;
+      box-shadow: 0 10px 22px rgba(14, 107, 82, .24);
+    }
+    button.primary:disabled { opacity: .55; cursor: wait; box-shadow: none; }
+    .hint { color: var(--muted); font-size: 13px; }
+    #result { display: none; margin-top: 22px; padding-top: 18px; border-top: 1px solid var(--line); }
+    #result.show { display: block; }
+    .result-head { display: flex; justify-content: space-between; gap: 12px; align-items: center; }
+    .result-head h2 { margin: 0; font-size: 16px; letter-spacing: 0.04em; }
+    .tag { font-size: 12px; border-radius: 999px; padding: 4px 10px; background: #e7f5ef; color: var(--ok); }
+    .tag.warn { background: #f8eadb; color: var(--warn); }
+    .logs { margin-top: 12px; max-height: 280px; overflow: auto; font-size: 13px; line-height: 1.6; }
+    .logs div { padding: 3px 0; }
+    .logs .bad { color: var(--bad); }
+    .logs .warn { color: var(--warn); }
+    .logs .ok { color: var(--ok); }
+    .error {
+      display: none; margin-top: 14px; color: var(--bad);
+      background: #fbeeee; border-radius: 14px; padding: 12px 14px; font-size: 14px;
+    }
+    .error.show { display: block; }
+    @media (max-width: 640px) {
+      .page { padding-top: 28px; }
+      .panel { padding: 20px; border-radius: 22px; }
+      .grid { grid-template-columns: 1fr; }
+      h1 { font-size: 24px; }
+    }
+  </style>
+</head>
+<body>
+  <div class="page">
+    <header>
+      <div class="mark" aria-hidden="true"></div>
+      <div>
+        <h1>财务报表整理</h1>
+        <p class="sub">上传系统导入版三表，生成资产、损益、现金流和指标简表。</p>
+      </div>
+    </header>
+    <form class="panel" id="form">
+      <div class="drop" id="drop">
+        <div class="glyph" aria-hidden="true">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M12 16V5" />
+            <path d="M8 8l4-4 4 4" />
+            <path d="M5 16.5V19a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-2.5" />
+          </svg>
+        </div>
+        <strong>把财务报表拖到这里</strong>
+        <p>支持 xls、xlsx、et。</p>
+        <span class="file-pill" id="pill"></span>
+      </div>
+      <input id="source" name="source" type="file" accept=".xls,.xlsx,.et" />
+      <div class="grid">
+        <label class="field">输出单位
+          <div class="choice" id="unit">
+            <button type="button" data-value="yi" class="active">亿元</button>
+            <button type="button" data-value="wan">万元</button>
+          </div>
+        </label>
+        <label class="field">取最近几期
+          <input id="periods" type="number" min="1" max="20" value="4" />
+        </label>
+      </div>
+      <div class="template-row">
+        <button class="ghost" id="pickTemplate" type="button">更换导出模板</button>
+        <span id="templateName"></span>
+      </div>
+      <input id="template" type="file" accept=".xlsx" />
+      <div class="actions">
+        <button class="primary" id="submit" type="submit">生成并下载</button>
+        <span class="hint" id="status">金额会换算，比率和百分比保持原口径。</span>
+      </div>
+      <div class="error" id="error"></div>
+      <section id="result">
+        <div class="result-head">
+          <h2>整理结果</h2>
+          <span class="tag" id="resultTag">已生成</span>
+        </div>
+        <div class="logs" id="logs"></div>
+      </section>
+    </form>
+  </div>
+  <script>
+    const sourceInput = document.querySelector("#source");
+    const templateInput = document.querySelector("#template");
+    const drop = document.querySelector("#drop");
+    const pill = document.querySelector("#pill");
+    const form = document.querySelector("#form");
+    const submit = document.querySelector("#submit");
+    const errorBox = document.querySelector("#error");
+    const result = document.querySelector("#result");
+    const logs = document.querySelector("#logs");
+    const resultTag = document.querySelector("#resultTag");
+    const status = document.querySelector("#status");
+    const picks = { unit: "yi" };
+    const idleHint = "金额会换算，比率和百分比保持原口径。";
+    let shownId = "";
+
+    function send(type, data) {
+      window.parent.postMessage(Object.assign({ isStreamlitMessage: true, type: type }, data || {}), "*");
+    }
+    function fit() {
+      send("streamlit:setFrameHeight", { height: Math.ceil(document.body.scrollHeight) });
+    }
+    function showError(message) {
+      errorBox.textContent = message;
+      errorBox.classList.add("show");
+      status.textContent = idleHint;
+      submit.disabled = false;
+      fit();
+    }
+    function classify(line) {
+      if (line.startsWith("【勾稽告警】") || line.startsWith("【严重告警】")) return "warn";
+      if (line.startsWith("【未映射科目】") || line.startsWith("【未识别模板行】")) return "bad";
+      return "ok";
+    }
+    function readFile(file) {
+      return new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => resolve(String(reader.result).split(",")[1] || "");
+        reader.onerror = () => reject(new Error("读取文件失败"));
+        reader.readAsDataURL(file);
+      });
+    }
+    function showResult(data) {
+      const binary = atob(data.content_base64);
+      const bytes = new Uint8Array(binary.length);
+      for (let i = 0; i < binary.length; i += 1) bytes[i] = binary.charCodeAt(i);
+      const url = URL.createObjectURL(new Blob([bytes], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" }));
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = data.filename || "资产类财务数据_导出.xlsx";
+      link.click();
+      URL.revokeObjectURL(url);
+      logs.innerHTML = "";
+      (data.logs || []).forEach((line) => {
+        const row = document.createElement("div");
+        row.className = classify(line);
+        row.textContent = line;
+        logs.appendChild(row);
+      });
+      const warned = (data.logs || []).some((line) => classify(line) !== "ok");
+      resultTag.textContent = warned ? "已生成，请看提示" : "已生成";
+      resultTag.classList.toggle("warn", warned);
+      result.classList.add("show");
+      status.textContent = "文件已开始下载。";
+      submit.disabled = false;
+      fit();
+    }
+
+    document.querySelector("#unit").addEventListener("click", (event) => {
+      const button = event.target.closest("button");
+      if (!button) return;
+      picks.unit = button.dataset.value;
+      document.querySelectorAll("#unit button").forEach((item) => item.classList.toggle("active", item === button));
+    });
+    drop.addEventListener("click", () => sourceInput.click());
+    sourceInput.addEventListener("change", () => {
+      const file = sourceInput.files[0];
+      if (!file) { pill.classList.remove("show"); return; }
+      pill.textContent = file.name;
+      pill.classList.add("show");
+    });
+    ["dragenter", "dragover"].forEach((name) => drop.addEventListener(name, (event) => {
+      event.preventDefault();
+      drop.classList.add("over");
+    }));
+    ["dragleave", "drop"].forEach((name) => drop.addEventListener(name, (event) => {
+      event.preventDefault();
+      drop.classList.remove("over");
+    }));
+    drop.addEventListener("drop", (event) => {
+      const file = event.dataTransfer.files[0];
+      if (!file) return;
+      const transfer = new DataTransfer();
+      transfer.items.add(file);
+      sourceInput.files = transfer.files;
+      pill.textContent = file.name;
+      pill.classList.add("show");
+    });
+    document.querySelector("#pickTemplate").addEventListener("click", () => templateInput.click());
+    templateInput.addEventListener("change", () => {
+      document.querySelector("#templateName").textContent = templateInput.files[0] ? templateInput.files[0].name : "";
+    });
+
+    form.addEventListener("submit", async (event) => {
+      event.preventDefault();
+      errorBox.classList.remove("show");
+      const sourceFile = sourceInput.files[0];
+      if (!sourceFile) {
+        showError("请先选择财务报表。");
+        return;
+      }
+      submit.disabled = true;
+      status.textContent = "正在整理，请稍等…";
+      try {
+        const payload = {
+          kind: "convert",
+          id: String(Date.now()) + "-" + Math.random().toString(16).slice(2),
+          source_name: sourceFile.name,
+          source_b64: await readFile(sourceFile),
+          unit: picks.unit,
+          periods: Number(document.querySelector("#periods").value || "4")
+        };
+        if (templateInput.files[0]) {
+          payload.template_name = templateInput.files[0].name;
+          payload.template_b64 = await readFile(templateInput.files[0]);
+        }
+        send("streamlit:setComponentValue", { value: payload, dataType: "json" });
+      } catch (err) {
+        showError("读取文件失败。");
+      }
+    });
+
+    window.addEventListener("message", (event) => {
+      const data = event.data || {};
+      if (data.type !== "streamlit:render") return;
+      const reply = data.args && data.args.result;
+      if (reply && reply.id && reply.id !== shownId) {
+        shownId = reply.id;
+        if (reply.ok) showResult(reply);
+        else showError(reply.detail || "整理失败");
+      }
+      fit();
+    });
+    send("streamlit:componentReady", { apiVersion: 1 });
+    fit();
+  </script>
+</body>
+</html>

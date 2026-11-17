@@ -1,12 +1,13 @@
 [server]
 headless = true
 maxUploadSize = 25
+maxMessageSize = 80
 
 [browser]
 gatherUsageStats = false
 
 [theme]
 primaryColor = "#2f5d50"
-backgroundColor = "#f7f6f3"
-secondaryBackgroundColor = "#ffffff"
+backgroundColor = "#f4f0e8"
+secondaryBackgroundColor = "#fffcf8"
 textColor = "#1c1917"
