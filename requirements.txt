@@ -3,3 +3,4 @@ uvicorn
 python-multipart
 openpyxl
 xlrd
+streamlit>=1.38.0
